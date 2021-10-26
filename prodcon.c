@@ -7,13 +7,6 @@
 #include "prodcon.h"
 #include "tands.h"
 
-char line[50];
-int work_command = 0;
-int ask_command = 0;
-int receive_command = 0;
-int complete_command = 0;
-int sleep_command = 0;
-
 void *prod(void *producer_thread_id){
     
     printf("Producer will begin...\n");
@@ -157,22 +150,21 @@ int main(int argc, char *argv[]){
         - argv: the char system arguments
     */ 
     
-
     // allocate dynamic memory for the number of instructions
     args = malloc(MAXINSTRUCTIONS*sizeof(char*));
     // check the amount of arguments provided to the terminal
     // if the number of provided arguments is two save them to the variable
     if( argc == 3 || argc == 2 ){
+        // save the second argument to nthreads variable
         nthreads = atoi(argv[1]);
-
-        // if no id argument is supplied go to default (0)
+        // if no id argument is supplied go to default (0) and open the log file as append
         if( argc == 2 ){
             fp = fopen("prodcon.log", "a+");
         } else {
             char file_name[50];
+            // parse the name according the the argument pass in command
             snprintf(file_name, sizeof(file_name), "prodcon.%s.log", argv[2]);
-            fp = fopen(file_name, "a+");
-            
+            fp = fopen(file_name, "a+"); 
         }
         // initialize the counter index for the args array
         int i = 0;
@@ -186,7 +178,7 @@ int main(int argc, char *argv[]){
             // increment the index by one
             i++;
         }
-        // create an array with threads id's
+        // create an array with threads id's to pass to the consumer function
         int cons_id[nthreads];
         for (int i =0; i< nthreads; i++){
             cons_id[i] = i+1;
@@ -194,7 +186,7 @@ int main(int argc, char *argv[]){
 
         // begin the producer thread
         pthread_t producer_thread, consumer_thread[nthreads];
-
+        // initialize the semaphores
         pthread_mutex_init(&mutex, NULL);
         pthread_mutex_init(&filemutex, NULL);
         pthread_mutex_init(&nthreadmutex, NULL);
@@ -215,7 +207,7 @@ int main(int argc, char *argv[]){
         }
         printf("Main: all threads finished.\n");
         
-        // print the summary to the log
+        // print the summary to the log after all threads have finished
         fputs("Summary:\n", fp);
         snprintf(line, sizeof(line), "    Work:         %d\n",work_command);
         fputs(line,fp);
@@ -232,14 +224,13 @@ int main(int argc, char *argv[]){
             fputs(line,fp);
         }
         
-        // get the max time taken to complete the last task
+        // get the max time took to complete the last task and put it at the begining of the array
         for (int i = 1; i < MAXSLOTSJOBS; ++i) {
             if (time_taken_to_complete[0] < time_taken_to_complete[i]) {
                 time_taken_to_complete[0] = time_taken_to_complete[i];
             }
         }
-
-
+        // print the number of transaction per second according to the total time took to complete the last job
         snprintf(line, sizeof(line), "Transactions per second: %f in %f", work_command/time_taken_to_complete[0], time_taken_to_complete[0]);
         fputs(line,fp);
         
@@ -257,6 +248,7 @@ int main(int argc, char *argv[]){
     pthread_mutex_destroy(&nthreadmutex);
     sem_destroy(&empty);
     sem_destroy(&full);
+    // close the log file
     fclose(fp);
     // free the memory space of the dynamic memory space
     free(args);
