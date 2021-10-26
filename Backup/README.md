@@ -15,6 +15,3 @@ In the file, we would like to see the following:
 =====
 
 And... make sure you test your program on the undergraduate lab machines before submitting your assignment!
-
-
-Control-D on the keyboard generates the end-of-file/end-of-input character.

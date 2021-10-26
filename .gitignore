@@ -1,5 +1,6 @@
 # Personal files
 prodcon
+*.log
 
 # Prerequisites
 *.d
