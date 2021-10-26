@@ -26,6 +26,13 @@ pthread_mutex_t filemutex;
 pthread_mutex_t nthreadmutex;
 FILE *fp; // create the log file
 
+char line[50];
+int work_command = 0;
+int ask_command = 0;
+int receive_command = 0;
+int complete_command = 0;
+int sleep_command = 0;
+
 clock_t t; // to keep track of time
 double time_taken;
 #define MAXSLOTSJOBS 100
