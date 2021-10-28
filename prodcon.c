@@ -77,6 +77,36 @@ void write_complete_in_file(int consumer_id, int item){
     pthread_mutex_unlock(&filemutex);
 }
 
+void write_summary_in_file(void){
+    pthread_mutex_lock(&nthreadmutex);
+    fputs("Summary:\n", fp);
+    snprintf(line, sizeof(line), "    Work:         %d\n",work_command);
+    fputs(line,fp);
+    snprintf(line, sizeof(line), "    Ask:          %d\n",ask_command);
+    fputs(line,fp);
+    snprintf(line, sizeof(line), "    Receive:      %d\n",receive_command);
+    fputs(line,fp);
+    snprintf(line, sizeof(line), "    Complete:     %d\n",complete_command);
+    fputs(line,fp);
+    snprintf(line, sizeof(line), "    Sleep:        %d\n",sleep_command);
+    fputs(line,fp);
+    for(int i=0; i<nthreads; i++){
+        snprintf(line,sizeof(line), "    Thread  %d     %d\n", i+1, nthreads_jobs[i]);
+        fputs(line,fp);
+    }
+    pthread_mutex_unlock(&nthreadmutex);
+    
+    // get the max time it takes to complete the last task and put it at the begining of the array
+    for (int i = 1; i < MAXINSTRUCTIONS; ++i) {
+        if (time_taken_to_complete[0] < time_taken_to_complete[i]) {
+            time_taken_to_complete[0] = time_taken_to_complete[i];
+        }
+    }
+    // print the number of transaction per second according to the total time took to complete the last job
+    snprintf(line, sizeof(line), "Transactions per second: %f\n", work_command/time_taken_to_complete[0]);
+    fputs(line,fp);
+}
+
 void *prod(void *producer_thread_id){
     // Producer will begin
     // We start the timer to take steps through the program of the time
@@ -141,12 +171,12 @@ void *prod(void *producer_thread_id){
     return NULL;   
 }
 
-void *cons(void *cno){
+void *cons(void *consumer_id){
     // initialize thread counter for each job taken
     int nthread_taken_jobs = 0;
     while(1){
         // write in log that thread is asking for job
-        write_ask_in_file(*((int *)cno));
+        write_ask_in_file(*((int *)consumer_id));
 
         // wait for the queue not empty, until it has data.
         sem_wait(&full);
@@ -158,7 +188,7 @@ void *cons(void *cno){
         n_jobs_in_queue--;
         // write in the file and increase the receive counter only if it is not a termination job
         if (queue[consumer_index] != -1){
-            write_receive_in_file(*((int *)cno), item);
+            write_receive_in_file(*((int *)consumer_id), item);
         }
         // go to the next queue element
         consumer_index = (consumer_index+1)%(2*nthreads);
@@ -171,21 +201,19 @@ void *cons(void *cno){
         if (item != -1){
             // we execute the job
             Trans(item);
-            
-            write_complete_in_file(*((int *)cno), item);
-           
+            // write the complete transaction in the file fp
+            write_complete_in_file(*((int *)consumer_id), item);
         } else {
             // save the number of jobs each one did only one at a time
             pthread_mutex_lock(&nthreadmutex);
-            nthreads_jobs[*((int *)cno)-1] = nthread_taken_jobs;
+            nthreads_jobs[*((int *)consumer_id)-1] = nthread_taken_jobs;
             pthread_mutex_unlock(&nthreadmutex);
-            printf("Consumer: %i finished with a total of %d jobs.\n", *((int *)cno), nthreads_jobs[*((int *)cno)-1]);
+            //printf("Consumer: %i finished with a total of %d jobs.\n", *((int *)consumer_id), nthreads_jobs[*((int *)consumer_id)-1]);
             return NULL;
         }
+        // increase the local variable for each thread to count the number of jobs
         nthread_taken_jobs++;
     }
-    
-
     return NULL;
 }
 
@@ -198,6 +226,7 @@ int main(int argc, char *argv[]){
     
     // allocate dynamic memory for the number of instructions
     args = malloc(MAXINSTRUCTIONS*sizeof(char*));
+    // if there is an error in generating the space in memory it will exit
     if (args == NULL){
             printf("Memory error.\n");
             exit(1);
@@ -262,37 +291,8 @@ int main(int argc, char *argv[]){
         for(int id_thread = 0; id_thread < nthreads; id_thread++){
             pthread_join(consumer_thread[id_thread], NULL);
         }
-        printf("Main: all threads finished.\n");
-        
         // print the summary to the log after all threads have finished
-        pthread_mutex_lock(&nthreadmutex);
-        fputs("Summary:\n", fp);
-        snprintf(line, sizeof(line), "    Work:         %d\n",work_command);
-        fputs(line,fp);
-        snprintf(line, sizeof(line), "    Ask:          %d\n",ask_command);
-        fputs(line,fp);
-        snprintf(line, sizeof(line), "    Receive:      %d\n",receive_command);
-        fputs(line,fp);
-        snprintf(line, sizeof(line), "    Complete:     %d\n",complete_command);
-        fputs(line,fp);
-        snprintf(line, sizeof(line), "    Sleep:        %d\n",sleep_command);
-        fputs(line,fp);
-        for(int i=0; i<nthreads; i++){
-            snprintf(line,sizeof(line), "    Thread  %d     %d\n", i+1, nthreads_jobs[i]);
-            fputs(line,fp);
-        }
-        pthread_mutex_unlock(&nthreadmutex);
-        
-        // get the max time it takes to complete the last task and put it at the begining of the array
-        for (int i = 1; i < MAXINSTRUCTIONS; ++i) {
-            if (time_taken_to_complete[0] < time_taken_to_complete[i]) {
-                time_taken_to_complete[0] = time_taken_to_complete[i];
-            }
-        }
-        
-        // print the number of transaction per second according to the total time took to complete the last job
-        snprintf(line, sizeof(line), "Transactions per second: %f in %.3f\n", work_command/time_taken_to_complete[0], time_taken_to_complete[0]);
-        fputs(line,fp);
+        write_summary_in_file();
         
     // if more than 2 arguments are supplied exit
     } else if( argc > 3 ) {
@@ -309,7 +309,6 @@ int main(int argc, char *argv[]){
     pthread_mutex_destroy(&nthreadmutex);
     sem_destroy(&empty);
     sem_destroy(&full);
-    
     // close the log file
     fclose(fp);
     // free the memory space of the dynamic memory spaces used
