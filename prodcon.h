@@ -31,6 +31,7 @@ int ask_command = 0;
 int receive_command = 0;
 int complete_command = 0;
 int sleep_command = 0;
+int n_jobs_in_queue = 0;
 
 clock_t t; // to keep track of time
 double time_taken;

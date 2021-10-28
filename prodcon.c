@@ -37,13 +37,14 @@ void *prod(void *producer_thread_id){
 
             // write in the queue
             queue[producer_index] = atoi(args[i]+1);
+            n_jobs_in_queue++;
             printf("Producer put a job of: T%d in queue slot %d\n",atoi(args[i]+1), producer_index);
             // go to the next queue element
             if (queue[producer_index] != -1){
                 pthread_mutex_lock(&filemutex);
                 t = clock() - t;
                 time_taken = ((double)t)/CLOCKS_PER_SEC;
-                snprintf(line, sizeof(line), "%.3f  ID= 0   Q= %d   Work         %d\n", time_taken, producer_index, atoi(args[i]+1));
+                snprintf(line, sizeof(line), "%.3f  ID= 0   Q= %d   Work         %d\n", time_taken, n_jobs_in_queue, atoi(args[i]+1));
                 fputs(line , fp);
                 pthread_mutex_unlock(&filemutex);
             }
@@ -100,6 +101,7 @@ void *cons(void *cno){
         fputs(line , fp);
         ask_command++;
         pthread_mutex_unlock(&filemutex);
+
         // wait for the queue not empty, until it has data.
         sem_wait(&full);
         // only one thread can access the queue at a time
@@ -107,12 +109,13 @@ void *cons(void *cno){
 
         // get a job from the queue
         int item = queue[consumer_index];
+        n_jobs_in_queue--;
 
         if (queue[consumer_index]!=-1){
         pthread_mutex_lock(&filemutex);
             t = clock() - t;
             time_taken = ((double)t)/CLOCKS_PER_SEC;
-            snprintf(line, sizeof(line), "%.3f  ID= %d   Q= %d   Receive      %d\n", time_taken, *((int *)cno), consumer_index, item);
+            snprintf(line, sizeof(line), "%.3f  ID= %d   Q= %d   Receive      %d\n", time_taken, *((int *)cno), n_jobs_in_queue, item);
             fputs(line , fp);
             receive_command++;
             pthread_mutex_unlock(&filemutex);
