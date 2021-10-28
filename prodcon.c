@@ -1,4 +1,4 @@
-#include <stdio.h> // to handle printf
+#include <stdio.h>
 #include <stdlib.h> // to handle system arguments
 #include <string.h> // to handle strcpy
 #include <pthread.h> // to handle threads
@@ -7,84 +7,137 @@
 #include "prodcon.h"
 #include "tands.h"
 
+void get_time(void){
+    // take another step in the timer
+    timer = clock();
+    // get the time in seconds, just by dividing over the amount of clocks per second
+    time_taken = ((double)timer)/CLOCKS_PER_SEC;
+}
+
+void write_sleep_in_file(int i){
+    // only one thread can be writing at a time in the file fp
+    pthread_mutex_lock(&filemutex);
+    // get a time step
+    get_time();
+    // temporarily save the printed line to pass it to the file
+    snprintf(line, sizeof(line), "%.3f  ID= 0          Sleep        %d\n", time_taken, atoi(args[i]+1));
+    // put the printed line in the file
+    fputs(line , fp);
+    // increase the counter of sleep command
+    sleep_command++;
+    // free the mutex
+    pthread_mutex_unlock(&filemutex);
+}
+
+void write_works_in_file(int i){
+    pthread_mutex_lock(&filemutex);
+    get_time();
+    snprintf(line, sizeof(line), "%.3f  ID= 0   Q= %d   Work         %d\n", time_taken, n_jobs_in_queue, atoi(args[i]+1));
+    fputs(line , fp);
+    // increase the work command counter by one every time it put a job in the queue
+    work_command++;
+    pthread_mutex_unlock(&filemutex);
+}
+
+void write_end_in_file(void){
+    pthread_mutex_lock(&filemutex);
+    get_time();
+    snprintf(line, sizeof(line), "%.3f  ID= 0          End\n", time_taken);
+    fputs(line , fp);
+    pthread_mutex_unlock(&filemutex);
+}
+
+void write_ask_in_file(int thread_identifier){
+    pthread_mutex_lock(&filemutex);
+    get_time();
+    snprintf(line, sizeof(line), "%.3f  ID= %d          Ask\n", time_taken, thread_identifier);
+    fputs(line , fp);
+    // increase the ask command counter
+    ask_command++;
+    pthread_mutex_unlock(&filemutex);
+}
+
+void write_receive_in_file(int consumer_id, int item){
+    pthread_mutex_lock(&filemutex);
+    get_time();
+    snprintf(line, sizeof(line), "%.3f  ID= %d   Q= %d   Receive      %d\n", time_taken, consumer_id, n_jobs_in_queue, item);
+    fputs(line , fp);
+    // increase the receive command counter after taking a job from the queue
+    receive_command++;
+    pthread_mutex_unlock(&filemutex);
+}
+
+void write_complete_in_file(int consumer_id, int item){
+    pthread_mutex_lock(&filemutex);
+    timer = clock();
+    time_taken_to_complete[complete_command] = ((double)timer)/CLOCKS_PER_SEC;
+    snprintf(line, sizeof(line), "%.3f  ID= %d          Complete     %d\n", time_taken_to_complete[complete_command], consumer_id, item);
+    fputs(line , fp);
+    complete_command++;
+    pthread_mutex_unlock(&filemutex);
+}
+
 void *prod(void *producer_thread_id){
-    
-    printf("Producer will begin...\n");
-    t = clock();
-    // begin an index for the number of instructions
+    // Producer will begin
+    // We start the timer to take steps through the program of the time
+    timer = clock();
+    // begin an index for the number of instructions that we will be saved in args
     int i = 0;
     // while there are instructions available, loop
     while( args[i] != NULL){
-
         // if the instructions contain S then call sleep function
         if( strstr(args[i],"S") != NULL ){
-            printf("Producer will sleep for: %d\n", atoi(args[i]+1));
-            pthread_mutex_lock(&filemutex);
-            t = clock() - t;
-            time_taken = ((double)t)/CLOCKS_PER_SEC;
-            snprintf(line, sizeof(line), "%.3f  ID= 0          Sleep        %d\n", time_taken, atoi(args[i]+1));
-            fputs(line , fp);
-            pthread_mutex_unlock(&filemutex);
+            // write each sleep command in the queue
+            write_sleep_in_file(i);
             // convert the string to integer and pass it to Sleep function
             Sleep(atoi(args[i]+1));
-            sleep_command++;
-            printf("Producer finished sleeping.\n");
         } else {
+            // if it is a transaction job then we will write in the queue when is not full and once at a time
             // wait for the queue not full
+
             sem_wait(&empty);
             // wait to be the only one accesing the queue to write a job
             pthread_mutex_lock(&mutex);
-
             // write in the queue
             queue[producer_index] = atoi(args[i]+1);
+            // increase the counter of number of jobs in queue (q)
             n_jobs_in_queue++;
-            printf("Producer put a job of: T%d in queue slot %d\n",atoi(args[i]+1), producer_index);
-            // go to the next queue element
+            // if the element in the queue is not a termination job then write it in the log
             if (queue[producer_index] != -1){
-                pthread_mutex_lock(&filemutex);
-                t = clock() - t;
-                time_taken = ((double)t)/CLOCKS_PER_SEC;
-                snprintf(line, sizeof(line), "%.3f  ID= 0   Q= %d   Work         %d\n", time_taken, n_jobs_in_queue, atoi(args[i]+1));
-                fputs(line , fp);
-                pthread_mutex_unlock(&filemutex);
+                // write each work produce in the queue
+                write_works_in_file(i);
             }
+            // set the index to the next queue element
             producer_index = (producer_index+1)%(2*nthreads);
-            work_command++;
-
             // free the access to the queue
             pthread_mutex_unlock(&mutex);
             // send signal queue is not empty
             sem_post(&full);
 
         }
-        // increase the index of instructions
+        // increase the index to select the next instruction
         i++;
     }
-    // once the producer has finished posting jobs in the queue we will
+    // once the producer has finished posting jobs in the queue we will write termination jobs for each thread
     for(int i=0; i<nthreads;i++){
+
         // wait for the queue not full
         sem_wait(&empty);
         // wait to be the only one accesing the queue to write a job
         pthread_mutex_lock(&mutex);
-        
         // write in the queue
         queue[producer_index] = -1;
-        printf("Producer put a termination job.\n");
         // go to the next queue element
         producer_index = (producer_index+1)%(2*nthreads);
-
         // free the access to the queue
         pthread_mutex_unlock(&mutex);
         // send signal queue is not empty
         sem_post(&full);
+
     }
-    pthread_mutex_lock(&filemutex);
-    t = clock() - t;
-    time_taken = ((double)t)/CLOCKS_PER_SEC;
-    snprintf(line, sizeof(line), "%.3f  ID= 0          End\n", time_taken);
-    fputs(line , fp);
-    pthread_mutex_unlock(&filemutex);
-    printf("Producer: Finished, waiting for consumers to finish...\n");
+    // write the end of the producer in the log
+    write_end_in_file();
+
     return NULL;   
 }
 
@@ -93,56 +146,34 @@ void *cons(void *cno){
     int nthread_taken_jobs = 0;
     while(1){
         // write in log that thread is asking for job
-        pthread_mutex_lock(&filemutex);
-        //char line[50];
-        t = clock() - t;
-        time_taken = ((double)t)/CLOCKS_PER_SEC;
-        snprintf(line, sizeof(line), "%.3f  ID= %d          Ask\n", time_taken, *((int *)cno));
-        fputs(line , fp);
-        ask_command++;
-        pthread_mutex_unlock(&filemutex);
+        write_ask_in_file(*((int *)cno));
 
         // wait for the queue not empty, until it has data.
         sem_wait(&full);
         // only one thread can access the queue at a time
         pthread_mutex_lock(&mutex);
-
         // get a job from the queue
         int item = queue[consumer_index];
+        // decrease the number of jobs in queue after taking one.
         n_jobs_in_queue--;
-
-        if (queue[consumer_index]!=-1){
-        pthread_mutex_lock(&filemutex);
-            t = clock() - t;
-            time_taken = ((double)t)/CLOCKS_PER_SEC;
-            snprintf(line, sizeof(line), "%.3f  ID= %d   Q= %d   Receive      %d\n", time_taken, *((int *)cno), n_jobs_in_queue, item);
-            fputs(line , fp);
-            receive_command++;
-            pthread_mutex_unlock(&filemutex);
+        // write in the file and increase the receive counter only if it is not a termination job
+        if (queue[consumer_index] != -1){
+            write_receive_in_file(*((int *)cno), item);
         }
-
         // go to the next queue element
         consumer_index = (consumer_index+1)%(2*nthreads);
-        // we free the access to the queue
+        // we free the access to the queue then we will execute the job to free the critical section
         pthread_mutex_unlock(&mutex);
         // send signal that queue is not full
         sem_post(&empty);
 
+
         if (item != -1){
-        
             // we execute the job
-            printf("Thread: %i grab job: T%d from the queue slot: %d\n", *((int *)cno), item, consumer_index-1);
             Trans(item);
-            printf("Thread: %i finished job: %d\n", *((int *)cno), item);
             
-            pthread_mutex_lock(&filemutex);
-            //char line[50];
-            t = clock() - t;
-            time_taken_to_complete[complete_command] = ((double)t)/CLOCKS_PER_SEC;
-            snprintf(line, sizeof(line), "%.3f  ID= %d          Complete     %d\n", time_taken_to_complete[complete_command], *((int *)cno), item);
-            fputs(line , fp);
-            complete_command++;
-            pthread_mutex_unlock(&filemutex);
+            write_complete_in_file(*((int *)cno), item);
+           
         } else {
             // save the number of jobs each one did only one at a time
             pthread_mutex_lock(&nthreadmutex);
@@ -260,7 +291,7 @@ int main(int argc, char *argv[]){
         }
         
         // print the number of transaction per second according to the total time took to complete the last job
-        snprintf(line, sizeof(line), "Transactions per second: %f in %.3f", work_command/time_taken_to_complete[0], time_taken_to_complete[0]);
+        snprintf(line, sizeof(line), "Transactions per second: %f in %.3f\n", work_command/time_taken_to_complete[0], time_taken_to_complete[0]);
         fputs(line,fp);
         
     // if more than 2 arguments are supplied exit
