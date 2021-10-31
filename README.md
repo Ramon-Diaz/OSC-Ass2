@@ -70,8 +70,6 @@ My program has the following assumptions:
 
 ## Approach
 
-* A brief summary of the approach you took to solving the assignment.
-
 The general idea of my program was to deploy two types of threads: producer and as many consumers as needed. The producer thread receives the instructions from the main function and starts executing them one by one. After the producer is created, the main program creates as many consumers as provided by the user. Every time a thread wanted to write/read on the queue, it must pass two semaphores. The first semaphore lock and unlock if the queue is empty or full, and the second semaphores locks and unlock the critical section where the thread can access the queue. Once a consumer takes a job, it increases the shared variable that captures the consumers' index of jobs inside the critical section. Once a producer puts a job in the queue, its index is increased by one. The program finishes once all jobs have been put in the queue by the producer and once the consumers complete all jobs. The producer will get out of the loop and write termination jobs in the queue for the consumers to read them and break out of the infinite loop.
 
 My program has an additional binary semaphore that allows only one thread to write in the log file and another to modify the number of jobs that the consumers have completed.
