@@ -2,9 +2,9 @@
 
 ## Author
 
-Ramon Diaz Ramos
-CCID: diazramo
-Date: October 30, 2021
+Ramon Diaz Ramos //
+CCID: diazramo //
+Date: October 30, 2021 //
 
 <details open="open">
 <summary>Table of Contents</summary>
