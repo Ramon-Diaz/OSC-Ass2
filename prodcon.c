@@ -6,19 +6,14 @@
 
 #include "prodcon.h"
 #include "tands.h"
+#include "timer_.h"
 
-void get_time(void){
-    // take another step in the timer
-    timer = clock();
-    // get the time in seconds, just by dividing over the amount of clocks per second
-    time_taken = ((double)timer)/CLOCKS_PER_SEC;
-}
 
 void write_sleep_in_file(int i){
     // only one thread can be writing at a time in the file fp
     pthread_mutex_lock(&filemutex);
     // get a time step
-    get_time();
+    time_taken = get_time(timer);
     // temporarily save the printed line to pass it to the file
     snprintf(line, sizeof(line), "%.3f  ID= 0          Sleep        %d\n", time_taken, atoi(args[i]+1));
     // put the printed line in the file
@@ -31,7 +26,7 @@ void write_sleep_in_file(int i){
 
 void write_works_in_file(int i){
     pthread_mutex_lock(&filemutex);
-    get_time();
+    time_taken = get_time(timer);
     snprintf(line, sizeof(line), "%.3f  ID= 0   Q= %d   Work         %d\n", time_taken, n_jobs_in_queue, atoi(args[i]+1));
     fputs(line , fp);
     // increase the work command counter by one every time it put a job in the queue
@@ -41,7 +36,7 @@ void write_works_in_file(int i){
 
 void write_end_in_file(void){
     pthread_mutex_lock(&filemutex);
-    get_time();
+    time_taken = get_time(timer);
     snprintf(line, sizeof(line), "%.3f  ID= 0          End\n", time_taken);
     fputs(line , fp);
     pthread_mutex_unlock(&filemutex);
@@ -49,7 +44,7 @@ void write_end_in_file(void){
 
 void write_ask_in_file(int thread_identifier){
     pthread_mutex_lock(&filemutex);
-    get_time();
+    time_taken = get_time(timer);
     snprintf(line, sizeof(line), "%.3f  ID= %d          Ask\n", time_taken, thread_identifier);
     fputs(line , fp);
     // increase the ask command counter
@@ -59,7 +54,7 @@ void write_ask_in_file(int thread_identifier){
 
 void write_receive_in_file(int consumer_id, int item){
     pthread_mutex_lock(&filemutex);
-    get_time();
+    time_taken = get_time(timer);
     snprintf(line, sizeof(line), "%.3f  ID= %d   Q= %d   Receive      %d\n", time_taken, consumer_id, n_jobs_in_queue, item);
     fputs(line , fp);
     // increase the receive command counter after taking a job from the queue
