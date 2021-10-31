@@ -9,7 +9,7 @@ Date: October 30, 2021 <br />
 <details open="open">
 <summary>Table of Contents</summary>
 
-- [Folders](#folders)
+- [Files](#folders)
 - [Getting Started](#getting-started)
   - [Execution](#usage)
 - [Assumptions](#assumptions)
@@ -18,9 +18,15 @@ Date: October 30, 2021 <br />
 
 </details>
 
-## Folders
+## Files
 
-* Give the names of each of the files in your submission and a brief summary of their contents.
+- Makefile: contains the set of intructions to compile the program
+- prodcon.c: is the main program to be executed, it contains the main, where the instructions are save and executed. It also contains the producer and consumer functions which are executed in threads. Additionally it contains all functions that write in the log file at the begining of the program.
+- prodcon.h: the header file which contains all global variables that are used by the prodcon c file
+- tands.c: provided file to simulate work of the producer and the consumers
+- tands.h: header file that contain both functions (Trans, Sleep) externed by the tands.c file
+- timer_.c: it contains the function get_time(), which returns a step of the initialized timer
+- timer_.h: the header file of the timer_,c file
 
 ## Getting Started
 
@@ -58,11 +64,11 @@ Then, the program will be idle until the instructions are provided manually sepa
 
 * List any assumptions you made in doing your assignment. It's easier if you tell us, rather than us having to find out the hard way.
 
+
+
 ## Approach
 
 * A brief summary of the approach you took to solving the assignment.
-
-
 
 ## Bibliography
 
